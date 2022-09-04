@@ -11,9 +11,18 @@ server.use(cors());
 server.use(express.json());
 dontenv.config();
 
-const db = new MongoClient(process.env.MONGO_URI);
+let db = null;
 
-server.post("/participantes", async (req,res) => {
+const mongoClient = new MongoClient(process.env.MONGO_URI);
+const promise = mongoClient.connect().then(() => {
+    db = mongoClient.db(process.env.MONGO_DATABASE_NAME);
+  });
+  
+  promise.catch(err => {
+    console.log('Deu pau ao conectar o banco de dados!!!!');
+  });
+
+server.post("/participants", async (req,res) => {
     const user = req.body;
 
     const validation = userSchema.validate(user);
@@ -37,11 +46,24 @@ server.post("/participantes", async (req,res) => {
         await db
         .collection("messages")
         .insertOne({ from: user.name, to: "Todos", text: "Entra na sala...", type: "status", time: dayjs().format("HH:MM:SS") });
+        console.log("Cheguei")
         
     }
 
     catch(error) {
+        console.log(error);
+        res.send("Não foi possível cadastrar")
+    }
+})
 
+server.get("/participants", async (req,res) => {
+    try{
+        const participants = await db.collection("users").find()
+        res.send(participants);
+    }
+    catch(error){
+        console.log(error)
+        res.send("Não foi possível pegar a lista de participantes");
     }
 })
 
@@ -57,4 +79,4 @@ const messageSchema = joi.object({
     type: joi.string().valid("message", "private_message")
 });
 
-server.listen(PORT || 5000, () => console.log("Listen on 5000"));
+server.listen(process.env.PORT || 5000, () => console.log("Listen on 5000"));
