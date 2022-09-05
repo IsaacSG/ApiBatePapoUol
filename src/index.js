@@ -1,9 +1,9 @@
 import express from "express";
 import cors from "cors";
-import dayjs from "dayjs";
-import dontenv from "dotenv";
-import joi from "joi";
-import { MongoClient } from "mongodb";
+import dayjs from "../.gitignore/node_modules/dayjs";
+import dontenv from "../.gitignore/node_modules/dotenv/lib/main";
+import joi from "../.gitignore/node_modules/joi/lib";
+import { MongoClient } from "../.gitignore/node_modules/mongodb/mongodb";
 
 const server = express();
 
@@ -83,7 +83,7 @@ server.post("/messages", async (req, res) => {
         .collection("users")
         .findOne({ name: user.name });
 
-        if(userVerify) {
+        if(!userVerify) {
             return res.status(422).send("Usuário não existe");
         }
 
@@ -136,6 +136,67 @@ server.get("/messages", async (req,res) => {
     res.send("Não foi possível ver as mensagens");
   }
 });
+
+server.post("/status", async (req, res) => {
+    const { user } = req.headers;
+
+    try{
+        const userVerify = await db
+        .collection("users")
+        .findOne({ name: user.name });
+
+        if(!userVerify) {
+            return res.status(404).send("User não encontrado");
+        }
+
+        await db
+        .collection("users")
+        .updateOne({name: user}, {$set: {lastStatus: Date.now()} });
+        res.sendStatus(200);
+    }
+
+    catch(error) {
+        console.log(error);
+        res.send("Não foi possível atualizar o status");
+        console.log(user);
+    }
+});
+
+const inactiveTime = 15000;
+setInterval(async () => {
+    const seconds = Date.now() - 10000;
+
+    try{
+        const inactiveUser = await db
+        .collection("users")
+        .find({ lastStatus: {$lte: seconds } })
+        .toArray();
+
+        if(inactiveUser.length > 0) {
+            const lastActive = inactiveUser.map(inactiveUser => {
+                return {
+                    from: inactiveUser.name,
+                    to: 'Todos',
+                    text: 'sai da sala...',
+                    type: 'status',
+                    time: dayjs().format('HH:MM:ss')
+                  };
+            });
+        }
+
+        await db
+        .collection("messages")
+        .insertOne(lastActive)
+
+        await db
+        .collection("users")
+        .deleteMany({ lastStatus: {$lte: seconds} });
+    }
+
+    catch(error) {
+        console.log(error);
+    }
+}, inactiveTime );
 
 
 /*SCHEMAS (Validações JOI)*/
